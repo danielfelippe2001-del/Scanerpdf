@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a73e8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>DocScan Offline</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    :root {
+      --primary: #1a73e8;
+      --bg: #0f0f0f;
+      --card: #1e1e1e;
+      --text: #f1f1f1;
+      --muted: #aaa;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: var(--card);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #333;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn:disabled { opacity: 0.5; }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid #555;
+      color: var(--text);
+    }
+    .btn-sm { padding: 6px 12px; font-size: 0.85rem; }
+    main { flex: 1; overflow: hidden; position: relative; }
+    .screen { display: none; height: 100%; flex-direction: column; }
+    .screen.active { display: flex; }
+
+    /* Home / Pastas */
+    #homeScreen { padding: 16px; overflow-y: auto; }
+    .folder-list { display: grid; gap: 12px; margin-top: 16px; }
+    .folder-card, .doc-card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      border: 1px solid #333;
+    }
+    .folder-card:active, .doc-card:active { background: #2a2a2a; }
+    .folder-icon { font-size: 1.6rem; }
+    .empty { text-align: center; color: var(--muted); margin-top: 40px; }
+
+    /* Câmera */
+    #cameraScreen video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+    }
+    .camera-controls {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 20px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.8));
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      align-items: center;
+    }
+    .shutter {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: white;
+      border: 4px solid var(--primary);
+      cursor: pointer;
+    }
+
+    /* Editor de quinas */
+    #editScreen { background: #000; }
+    #editCanvas {
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+    .edit-controls {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 16px;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+    .hint {
+      position: absolute;
+      top: 12px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.7);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      color: #ddd;
+    }
+
+    /* Preview / PDF */
+    #previewScreen { padding: 16px; overflow-y: auto; }
+    .page-list { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; }
+    .page-thumb {
+      background: var(--card);
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .page-thumb img { width: 70px; height: 90px; object-fit: cover; border-radius: 6px; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
+    /* Modal pastas */
+    .modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal.active { display: flex; }
+    .modal-content {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 20px;
+      width: 90%;
+      max-width: 360px;
+    }
+    .modal-content input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background: #111;
+      color: white;
+      margin: 12px 0;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 id="headerTitle">DocScan Offline</h1>
+    <div id="headerActions"></div>
+  </header>
+
+  <main>
+    <!-- TELA INICIAL / PASTAS -->
+    <div id="homeScreen" class="screen active">
+      <button class="btn" id="btnNewFolder" style="width:100%">+ Nova Pasta</button>
+      <div class="folder-list" id="folderList"></div>
+      <div class="empty" id="emptyFolders" style="display:none">Nenhuma pasta ainda.<br>Crie uma para começar.</div>
+    </div>
+
+    <!-- TELA DA PASTA -->
+    <div id="folderScreen" class="screen">
+      <button class="btn" id="btnScan" style="width:100%; margin-bottom:12px">📷 Escanear Documento</button>
+      <div class="folder-list" id="docList"></div>
+      <div class="empty" id="emptyDocs" style="display:none">Nenhum documento nesta pasta.</div>
+    </div>
+
+    <!-- CÂMERA -->
+    <div id="cameraScreen" class="screen">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="camera-controls">
+        <button class="btn btn-outline" id="btnCancelCamera">Cancelar</button>
+        <div class="shutter" id="btnCapture"></div>
+        <button class="btn btn-outline" id="btnSwitchCam">Trocar</button>
+      </div>
+    </div>
+
+    <!-- EDITOR DE QUINAS -->
+    <div id="editScreen" class="screen">
+      <div class="hint">Arraste as 4 quinas • toque e segure para precisão</div>
+      <canvas id="editCanvas"></canvas>
+      <div class="edit-controls">
+        <button class="btn btn-outline btn-sm" id="btnAutoDetect">Auto Detectar</button>
+        <button class="btn btn-sm" id="btnConfirmCrop">Confirmar Corte</button>
+        <button class="btn btn-outline btn-sm" id="btnRetake">Refazer</button>
+      </div>
+    </div>
+
+    <!-- PREVIEW DO DOCUMENTO (páginas) -->
+    <div id="previewScreen" class="screen">
+      <div class="page-list" id="pageList"></div>
+      <div class="actions">
+        <button class="btn" id="btnAddPage">+ Página</button>
+        <button class="btn" id="btnSavePdf">Salvar PDF</button>
+        <button class="btn btn-outline" id="btnCancelDoc">Cancelar</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal nova pasta -->
+  <div class="modal" id="folderModal">
+    <div class="modal-content">
+      <h3>Nova Pasta</h3>
+      <input type="text" id="folderNameInput" placeholder="Nome da pasta" maxlength="40">
+      <div style="display:flex; gap:10px; margin-top:8px">
+        <button class="btn btn-outline" style="flex:1" id="btnCancelFolder">Cancelar</button>
+        <button class="btn" style="flex:1" id="btnCreateFolder">Criar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
