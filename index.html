@@ -35,6 +35,7 @@
       justify-content: space-between;
       border-bottom: 1px solid #333;
       flex-shrink: 0;
+      z-index: 10;
     }
     header h1 { font-size: 1.1rem; font-weight: 600; }
     .btn {
@@ -75,7 +76,7 @@
     .folder-icon { font-size: 1.6rem; }
     .empty { text-align: center; color: var(--muted); margin-top: 40px; }
 
-    /* Câmera */
+    /* C芒mera */
     #cameraScreen video {
       width: 100%;
       height: 100%;
@@ -101,31 +102,68 @@
     }
 
     /* Editor de quinas */
-    #editScreen { background: #000; }
-    #editCanvas {
-      width: 100%;
-      height: 100%;
+    #editScreen {
+      background: #000;
+      position: relative;
+      overflow: hidden;
+    }
+    #editCanvasWrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
       touch-action: none;
     }
-    .edit-controls {
+    #editCanvas {
+      display: block;
+      touch-action: none;
+      max-width: 100%;
+      max-height: 100%;
+    }
+    /* Lupa */
+    #loupe {
       position: absolute;
-      bottom: 0; left: 0; right: 0;
-      padding: 16px;
-      background: rgba(0,0,0,0.85);
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      border: 3px solid #1a73e8;
+      box-shadow: 0 0 0 2px #fff, 0 4px 20px rgba(0,0,0,0.6);
+      pointer-events: none;
+      display: none;
+      overflow: hidden;
+      z-index: 20;
+      background: #000;
+    }
+    #loupeCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .edit-controls {
+      position: relative;
+      flex-shrink: 0;
+      padding: 14px 12px;
+      background: rgba(0,0,0,0.92);
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
       justify-content: center;
+      z-index: 15;
     }
     .hint {
       position: absolute;
-      top: 12px; left: 50%;
+      top: 10px; left: 50%;
       transform: translateX(-50%);
-      background: rgba(0,0,0,0.7);
+      background: rgba(0,0,0,0.75);
       padding: 6px 14px;
       border-radius: 20px;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       color: #ddd;
+      z-index: 15;
+      white-space: nowrap;
+      pointer-events: none;
     }
 
     /* Preview / PDF */
@@ -142,23 +180,27 @@
     .page-thumb img { width: 70px; height: 90px; object-fit: cover; border-radius: 6px; }
     .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
 
-    /* Modal pastas */
+    /* Modal */
     .modal {
       position: fixed; inset: 0;
-      background: rgba(0,0,0,0.7);
+      background: rgba(0,0,0,0.75);
       display: none;
       align-items: center;
       justify-content: center;
       z-index: 100;
+      padding: 16px;
     }
     .modal.active { display: flex; }
     .modal-content {
       background: var(--card);
       border-radius: 16px;
       padding: 20px;
-      width: 90%;
-      max-width: 360px;
+      width: 100%;
+      max-width: 400px;
+      max-height: 90dvh;
+      overflow-y: auto;
     }
+    .modal-content h3 { margin-bottom: 8px; }
     .modal-content input {
       width: 100%;
       padding: 12px;
@@ -168,6 +210,33 @@
       color: white;
       margin: 12px 0;
       font-size: 1rem;
+    }
+    .modal-content p, .modal-content li {
+      font-size: 0.9rem;
+      color: #ccc;
+      line-height: 1.45;
+    }
+    .modal-content ol { padding-left: 20px; margin: 10px 0; }
+    .modal-content li { margin-bottom: 6px; }
+    #qrContainer {
+      display: flex;
+      justify-content: center;
+      margin: 16px 0;
+      padding: 12px;
+      background: #fff;
+      border-radius: 12px;
+    }
+    #qrContainer canvas, #qrContainer img { max-width: 200px; }
+    .share-address {
+      background: #111;
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      word-break: break-all;
+      margin: 10px 0;
+      text-align: center;
     }
   </style>
 </head>
@@ -180,19 +249,22 @@
   <main>
     <!-- TELA INICIAL / PASTAS -->
     <div id="homeScreen" class="screen active">
-      <button class="btn" id="btnNewFolder" style="width:100%">+ Nova Pasta</button>
+      <div style="display:flex; gap:10px; margin-bottom:4px">
+        <button class="btn" id="btnNewFolder" style="flex:1">+ Nova Pasta</button>
+        <button class="btn btn-outline" id="btnShareNetwork" style="flex:1">馃摗 Rede Local</button>
+      </div>
       <div class="folder-list" id="folderList"></div>
-      <div class="empty" id="emptyFolders" style="display:none">Nenhuma pasta ainda.<br>Crie uma para começar.</div>
+      <div class="empty" id="emptyFolders" style="display:none">Nenhuma pasta ainda.<br>Crie uma para come莽ar.</div>
     </div>
 
     <!-- TELA DA PASTA -->
     <div id="folderScreen" class="screen">
-      <button class="btn" id="btnScan" style="width:100%; margin-bottom:12px">📷 Escanear Documento</button>
+      <button class="btn" id="btnScan" style="width:100%; margin-bottom:12px">馃摲 Escanear Documento</button>
       <div class="folder-list" id="docList"></div>
       <div class="empty" id="emptyDocs" style="display:none">Nenhum documento nesta pasta.</div>
     </div>
 
-    <!-- CÂMERA -->
+    <!-- C脗MERA -->
     <div id="cameraScreen" class="screen">
       <video id="video" autoplay playsinline muted></video>
       <div class="camera-controls">
@@ -204,8 +276,11 @@
 
     <!-- EDITOR DE QUINAS -->
     <div id="editScreen" class="screen">
-      <div class="hint">Arraste as 4 quinas • toque e segure para precisão</div>
-      <canvas id="editCanvas"></canvas>
+      <div class="hint">Arraste as 4 quinas 鈥� lupa aparece ao arrastar</div>
+      <div id="editCanvasWrap">
+        <canvas id="editCanvas"></canvas>
+        <div id="loupe"><canvas id="loupeCanvas" width="120" height="120"></canvas></div>
+      </div>
       <div class="edit-controls">
         <button class="btn btn-outline btn-sm" id="btnAutoDetect">Auto Detectar</button>
         <button class="btn btn-sm" id="btnConfirmCrop">Confirmar Corte</button>
@@ -213,11 +288,11 @@
       </div>
     </div>
 
-    <!-- PREVIEW DO DOCUMENTO (páginas) -->
+    <!-- PREVIEW DO DOCUMENTO -->
     <div id="previewScreen" class="screen">
       <div class="page-list" id="pageList"></div>
       <div class="actions">
-        <button class="btn" id="btnAddPage">+ Página</button>
+        <button class="btn" id="btnAddPage">+ P谩gina</button>
         <button class="btn" id="btnSavePdf">Salvar PDF</button>
         <button class="btn btn-outline" id="btnCancelDoc">Cancelar</button>
       </div>
@@ -236,7 +311,46 @@
     </div>
   </div>
 
+  <!-- Modal compartilhamento rede local -->
+  <div class="modal" id="shareModal">
+    <div class="modal-content">
+      <h3>馃摗 Compartilhar na Rede Local</h3>
+      <p style="margin-top:8px">
+        Como o app est谩 no GitHub Pages, o celular <strong>n茫o consegue</strong> abrir um servidor HTTP sozinho.
+        Use o m茅todo abaixo (funciona <strong>sem internet</strong>):
+      </p>
+      <ol>
+        <li>No celular, ative o <strong>Hotspot Wi-Fi</strong> (pode desligar os dados m贸veis).</li>
+        <li>No computador, conecte-se ao Wi-Fi do celular.</li>
+        <li>Instale um dos apps gratuitos:
+          <ul style="margin-top:4px">
+            <li><strong>Cx File Explorer</strong> (Android) 鈫� Rede 鈫� Acessar do PC</li>
+            <li><strong>LocalSend</strong> (Android + Windows/Mac/Linux)</li>
+            <li><strong>NetworkShare</strong> ou <strong>PlainApp</strong></li>
+          </ul>
+        </li>
+        <li>Abra o app no celular, inicie o compartilhamento e use o endere莽o/QR que ele mostrar no computador.</li>
+      </ol>
+
+      <p style="margin-top:12px"><strong>Ou compartilhe os PDFs agora:</strong></p>
+      <div style="display:flex; flex-direction:column; gap:8px; margin:10px 0">
+        <button class="btn" id="btnWebShare" style="width:100%">馃摛 Compartilhar via sistema</button>
+        <button class="btn btn-outline" id="btnDownloadAll" style="width:100%">猬囷笍 Baixar todos os PDFs</button>
+      </div>
+
+      <p style="margin-top:12px; font-size:0.85rem; color:#999">
+        Dica: salve os PDFs na pasta Downloads do celular e acesse essa pasta pelo app de compartilhamento acima.
+      </p>
+
+      <div id="qrContainer" style="display:none"></div>
+      <div class="share-address" id="shareAddress" style="display:none"></div>
+
+      <button class="btn btn-outline" style="width:100%; margin-top:12px" id="btnCloseShare">Fechar</button>
+    </div>
+  </div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
